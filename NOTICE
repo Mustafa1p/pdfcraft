@@ -58,3 +58,8 @@ dependencies change (plan/adr/0002, 0006).
 Vendored (vendor/, patched; see vendor/README.md):
 - hayro 0.7.1 — Apache-2.0 OR MIT, Copyright the hayro authors (licence files kept in vendor/hayro).
 - hayro-interpret 0.7.0 — Apache-2.0 OR MIT, Copyright the hayro authors (LICENSE-APACHE, LICENSE-MIT kept in vendor/hayro-interpret).
+
+Arabic editing review media (docs/demos/pr-1851-amiri-before-after.mp4 and .gif):
+Recording and title cards by Mustafa1p, MIT OR Apache-2.0.
+Amiri documentation/font software: Copyright (c) 2010-2013, Khaled Hosny; SIL Open Font License 1.1, full text at docs/demos/licenses/Amiri-OFL.txt.
+DejaVu Sans Mono: Copyright (c) 2003 Bitstream, Inc.; DejaVu changes are in public domain. Full Bitstream Vera terms and associated font notices are at docs/demos/licenses/DejaVu-LICENSE.txt.
