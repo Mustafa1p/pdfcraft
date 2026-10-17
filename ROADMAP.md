@@ -1,5 +1,7 @@
 # PdfCraft roadmap
 
+> **Last reviewed:** 2026-10-17 · **Last updated:** 2026-10-17 · **Change:** minor (M14: synchronize Arabic editing candidate with upstream link/file-name translations and refresh catalog attribution; estimates unchanged)
+
 > **Last reviewed:** 2026-10-16 · **Last updated:** 2026-10-16 · **Change:** minor (M14: integrate current upstream catalogs and parity corrections into the Arabic editing candidate; estimates unchanged)
 
 **Stage: alpha** · next: beta, ~25% (ready for real work 50% → 75%) and ~400–700 h away
@@ -159,6 +161,8 @@ Ranked; detail and the full milestone table in [docs/roadmap.md](docs/roadmap.md
 | 8 | 1.0 polish: performance, right-to-left, missing languages, keyboard-only (M14) | 55–95 |
 
 ## Progress log
+
+- **2026-10-17 (M14):** Updated the Arabic editing candidate to current main, preserving the new link/file-name translations and refreshing the merged catalog hash (2,671 Arabic keys). No readiness or feature-status changes.
 
 - 2026-10-16 — M14: rebased the Arabic editing candidate onto current main; retained upstream Vietnamese translations and parity evidence, refreshed catalog attribution, and checked the combined branch. Estimates unchanged.
 - **2026-10-15 (M2, gap 12):** `cargo xtask text-oracle` scores reading order as well as word F1: the longest common subsequence of the two word sequences over the longer one. F1 is a bag of words and cannot see order at all -- measuring #2431, a change that moves text and nothing else, it called 26 of the 29 files whose output changed identical, where the order score separated 18 improvements from 6 regressions. Reports, does not gate; a disagreement with Poppler, not a verdict. Estimates unchanged.
