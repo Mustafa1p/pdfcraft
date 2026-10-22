@@ -6374,6 +6374,28 @@ fn arabic_fallback_keeps_a_latin_row_in_its_source_font() {
 }
 
 #[test]
+fn arabic_fallback_keeps_distinct_latin_subset_encodings() {
+    if pdfcraft_fonts::document_arabic_font().is_none() {
+        return;
+    }
+    let content = "BT /F1 12 Tf 14 TL 72 700 Td (ab) Tj T* /F2 12 Tf (c) Tj T* /F1 12 Tf (bb) Tj ET";
+    let mut doc = build(&[
+        "<< /Type /Catalog /Pages 2 0 R >>",
+        "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 600 800] /Contents 4 0 R /Resources << /Font << /F1 5 0 R /F2 6 0 R >> >> >>",
+        &stream("", content),
+        "<< /Type /Font /Subtype /TrueType /BaseFont /ABCDEF+Inter /FirstChar 97 /LastChar 98 /Widths [500 500] /Encoding /WinAnsiEncoding >>",
+        "<< /Type /Font /Subtype /TrueType /BaseFont /GHIJKL+Inter /FirstChar 99 /LastChar 99 /Widths [500] /Encoding /WinAnsiEncoding >>",
+    ]);
+    assert_eq!(text::text_blocks(&doc, 0).unwrap()[0].editor_text, "ab\nc\nbb");
+    text::rewrite_block(&mut doc, 0, 0, Some("abc\nمرحبا"), &BlockStyle { color: Some([0.1, 0.2, 0.3]), ..Default::default() }).unwrap();
+    let saved = reopen(&doc);
+    let lines = text::text_lines(&saved, 0).unwrap();
+    assert_eq!(lines.iter().map(|line| line.text.as_str()).collect::<Vec<_>>(), ["abc", "مرحبا"]);
+    assert_eq!(lines[0].font, "F1");
+}
+
+#[test]
 fn arabic_fallback_keeps_negative_spacing_on_a_non_arabic_shaped_row() {
     if pdfcraft_fonts::document_arabic_font().is_none() {
         return;

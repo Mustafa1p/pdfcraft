@@ -800,6 +800,9 @@ pub(super) fn rewrite_styled_block(
         // aliases as a mixed-style paragraph. Real formatting boundaries stay strict.
         for row in &mut rows {
             let arabic_row = row.iter().any(|item| crate::added::is_arabic(item.0));
+            if !arabic_row {
+                continue;
+            }
             let Some((_, index, name)) = row.first().cloned() else { continue };
             let Some(anchor) = lines.get(index) else { continue };
             let face = pdfcraft_fonts::embedding::face_key(&anchor.base_font);

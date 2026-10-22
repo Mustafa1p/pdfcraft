@@ -245,6 +245,8 @@ pub struct LineEditor {
     max_width: f32,
     /// Expanded single-row bidi draft width and translation, in PDF user units.
     draft_layout: Option<(f64, [f64; 2])>,
+    /// Reuse the PDF measurement until the draft, formatting or source changes.
+    growth_measurement: Option<DraftMeasurement>,
     /// Current screen-space size. Recomputed from the current page transform before painting.
     size: f32,
     /// Take the keyboard focus on the next frame.
@@ -276,7 +278,29 @@ impl Default for Extras {
     }
 }
 
+#[derive(Clone, Debug, PartialEq)]
+struct DraftMeasurement {
+    generation: u64,
+    text: String,
+    style: pdfcraft_engine::BlockStyle,
+    rect: Option<[f64; 4]>,
+}
+
 impl LineEditor {
+    fn measured_growth(&mut self, doc: &pdfcraft_engine::Document, width: f64) -> Option<[f64; 4]> {
+        let mut style = self.style();
+        // Let Apply lay out the draft in the page's available container. Its actual
+        // bounds include source spacing and scale, independently of the interface face.
+        style.width = Some(width);
+        style.offset = None;
+        let generation = doc.edit_generation();
+        if self.growth_measurement.as_ref().is_none_or(|m| m.generation != generation || m.text != self.text || m.style != style) {
+            let rect = doc.text_edit_layout(self.page, self.block, &self.text, &style).ok().and_then(|layout| layout.draft_rect);
+            self.growth_measurement = Some(DraftMeasurement { generation, text: self.text.clone(), style, rect });
+        }
+        self.growth_measurement.as_ref().and_then(|m| m.rect)
+    }
+
     /// What Format text's font list shows: the chosen page font, a standard family picked
     /// instead, or the paragraph's own font (its `/BaseFont` without the subset tag).
     pub(crate) fn font_shown(&self, sources: &[(String, String)]) -> String {
@@ -1375,6 +1399,7 @@ pub(crate) fn open_block(
         overflow: false,
         max_width,
         draft_layout: None,
+        growth_measurement: None,
         size: (l.size as f32 * scale).clamp(8.0, 72.0),
         focus: true,
         look: look_of(l),
@@ -1584,7 +1609,7 @@ fn editor_galley(ui: &egui::Ui, ed: &LineEditor, text: &str, scale: f32, width: 
 }
 
 /// The inline editor; returns the edit once the text is applied.
-pub(crate) fn overlay(ctx: &egui::Context, view: &mut DocView, info: &DocInfo) -> Option<Edit> {
+pub(crate) fn overlay(ctx: &egui::Context, view: &mut DocView, info: &DocInfo, doc: &pdfcraft_engine::Document) -> Option<Edit> {
     // Clicks outside the document (the Format text panel) keep the paragraph open.
     let outside = ctx.input(|i| i.pointer.latest_pos()).is_some_and(|p| !view.viewport_rect().contains(p));
     let page = view.line_editor.as_ref()?.page;
@@ -1794,13 +1819,17 @@ pub(crate) fn overlay(ctx: &egui::Context, view: &mut DocView, info: &DocInfo) -
     if let Some(pieces) = look {
         view.text_background.remember(&xf, page, block, pieces, text_color);
     }
-    // Apply uses the same single-row container as the visible editor. Recompute after
-    // TextEdit processes this frame's input, including typing followed by click-away.
+    // Apply's container uses PDF advances rather than the interface face. Recompute
+    // after this frame's typing, including typing followed immediately by click-away.
     ed.draft_layout = if (crate::bidi::has_rtl(&ed.text) || crate::bidi::has_rtl(&ed.original)) && ed.grows_as_single_row() && ed.has_changes() {
         let rtl = unicode_bidi::get_base_direction(ed.text.as_str()) == unicode_bidi::Direction::Rtl;
-        let width = f64::from(grow_width(&ed.text, rtl) / scale);
         let source_width = f64::from((ed.source_rect[2] - ed.source_rect[0]).abs());
-        (width > source_width + 0.5).then_some((width, [if rtl { source_width - width } else { 0.0 }, 0.0]))
+        let available = if rtl { source_screen_rect.right() - xf.rect.left() } else { xf.rect.right() - source_screen_rect.left() };
+        let width = f64::from(available / scale).max(source_width).clamp(1.0, 14_400.0);
+        ed.measured_growth(doc, width).and_then(|bounds| {
+            let offset = if rtl { f64::from(ed.source_rect[2]) - bounds[2] } else { f64::from(ed.source_rect[0]) - bounds[0] };
+            (bounds[2] - bounds[0] > source_width + 0.5).then_some((width, [offset, 0.0]))
+        })
     } else {
         None
     };
@@ -1884,6 +1913,7 @@ mod tests {
             overflow: false,
             max_width: 400.0,
             draft_layout: None,
+            growth_measurement: None,
             size: block.size as f32,
             focus: true,
             look: look_of(&block),

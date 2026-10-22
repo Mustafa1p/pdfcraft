@@ -6052,3 +6052,48 @@ fn arabic_inline_editor_keeps_source_ink_and_the_applied_visual_until_redraw() {
         assert!(visible_arabic(&h), "the applied visual stays over the textless page until its raster arrives");
     }
 }
+
+#[test]
+fn rtl_inline_growth_uses_pdf_spacing_and_scale_when_applied() {
+    if pdfcraft_fonts::document_arabic_font().is_none() {
+        return;
+    }
+    let bytes =
+        source_font_fixture_with_text("BT /F1 12 Tf 150 Tz 4 Tc 200 220 Td /Span <</ActualText <FEFF06450631062D06280627>>> BDC (XX) Tj EMC ET");
+    let mut h = Harness::builder().with_size(egui::vec2(1400.0, 900.0)).build_eframe(move |_cc| {
+        let mut app = PdfCraftApp::new();
+        app.set_option("language", "en").unwrap();
+        app.open_bytes("rtl-spacing.pdf", None, bytes).unwrap();
+        app
+    });
+    h.run_steps(4);
+    assert!(h.state_mut().execute("edit.edit_text"));
+    h.run_steps(2);
+    let id = h.state().views[0].id;
+    let source = h.state().session.get(id).unwrap().text_blocks(0)[0].clone();
+    let page = h.state().views[0].page_screen_rect(0).unwrap();
+    let k = page.width() / 300.0;
+    click_at(
+        &mut h,
+        egui::pos2(
+            page.left() + ((source.rect[0] + source.rect[2]) * 0.5) as f32 * k,
+            page.top() + (300.0 - ((source.rect[1] + source.rect[3]) * 0.5) as f32) * k,
+        ),
+    );
+    let draft = "مرحبا WWW WWW";
+    h.state_mut().views[0].line_editor.as_mut().unwrap().text = draft.into();
+    h.run_steps(3);
+    assert!(!dirty(&h), "measuring a draft does not edit the PDF");
+    h.key_press_modifiers(Modifiers::COMMAND, Key::Enter);
+    h.run_steps(3);
+    assert!(dirty(&h));
+    let blocks = h.state().session.get(id).unwrap().text_blocks(0);
+    assert_eq!(blocks.len(), 1);
+    assert_eq!(blocks[0].rows.len(), 1, "a row that fits the page must not wrap on Apply");
+    assert_eq!(blocks[0].editor_text, draft);
+    assert!((blocks[0].rect[2] - source.rect[2]).abs() < 0.5, "RTL growth keeps the source right edge: {:?} -> {:?}", source.rect, blocks[0].rect);
+    let saved = h.state_mut().session.save_bytes(id).unwrap();
+    let mut reopened = pdfcraft_engine::Session::new();
+    let reopened_id = reopened.open("saved.pdf", None, saved, None).unwrap();
+    assert_eq!(reopened.get(reopened_id).unwrap().text_blocks(0), blocks);
+}
